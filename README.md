@@ -23,6 +23,13 @@ cd /home/daniel/VibeProjects/ChartDigest
 ./scripts/launch_local.sh
 ```
 
+By default this uses backend `:8010` (to avoid conflicts) and frontend `:5173`.
+Override if needed:
+
+```bash
+CHARTDIGEST_BACKEND_PORT=8000 CHARTDIGEST_FRONTEND_PORT=5174 ./scripts/launch_local.sh
+```
+
 Stop both:
 
 ```bash
