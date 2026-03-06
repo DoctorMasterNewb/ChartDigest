@@ -68,13 +68,13 @@ npm install
 
 ```bash
 cd /home/daniel/VibeProjects/ChartDigest
-.venv/bin/uvicorn app.main:app --app-dir backend --reload
+.venv/bin/uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8010 --reload
 ```
 
 Backend URLs:
 
-- API root: `http://127.0.0.1:8000/api`
-- Health: `http://127.0.0.1:8000/health`
+- API root: `http://127.0.0.1:8010/api`
+- Health: `http://127.0.0.1:8010/health`
 
 ### 5. Run frontend
 
@@ -109,6 +109,12 @@ npm run build
 
 ## Troubleshooting
 
+- Create Case does nothing or the list does not update:
+  Check the dev-only `Diagnostics` panel in the UI. `Active API base` must match the backend you actually started, for example `http://127.0.0.1:8010/api`. The frontend now refuses to silently fall back to `:8000`; if `VITE_API_BASE` is missing or wrong, the app shows an inline configuration error instead of failing quietly.
+- Backend and frontend are running, but the wrong server still answers:
+  This machine may already have another app listening on `127.0.0.1:8000`. Use the provided helper or set `VITE_API_BASE` explicitly so the frontend points at the intended Chart Digest backend.
+- `launch_local.sh` says the frontend is already running, but the expected port is not serving:
+  The helper now ignores empty/invalid PID files, but older stale runtime files can still exist from prior sessions. Stop local services and relaunch so the frontend binds the strict port again.
 - Provider test fails:
   Verify Ollama is running and the base URL is reachable from this machine. Check `curl http://HOST:11434/api/tags`.
 - Model errors:

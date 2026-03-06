@@ -179,9 +179,62 @@ pre {
   color: #a0301e;
 }
 
+.feedback {
+  margin: 0;
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+  font-weight: 600;
+}
+
+.feedback.info {
+  background: rgba(199, 145, 52, 0.14);
+  color: #7f4d16;
+}
+
+.feedback.success {
+  background: rgba(45, 128, 74, 0.14);
+  color: #215c36;
+}
+
+.feedback.error {
+  background: rgba(160, 48, 30, 0.12);
+  color: #a0301e;
+}
+
+.diagnostics {
+  margin-top: 1rem;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+  margin: 0;
+}
+
+.diagnostics-grid div {
+  min-width: 0;
+}
+
+.diagnostics-grid dt {
+  margin-bottom: 0.2rem;
+  color: #6d5a45;
+  font-size: 0.9rem;
+}
+
+.diagnostics-grid dd {
+  margin: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 900px) {
   .hero,
   .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostics-grid {
     grid-template-columns: 1fr;
   }
 

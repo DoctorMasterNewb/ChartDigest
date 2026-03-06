@@ -12,16 +12,31 @@ BACKEND_PORT="${CHARTDIGEST_BACKEND_PORT:-8010}"
 FRONTEND_PORT="${CHARTDIGEST_FRONTEND_PORT:-5173}"
 API_BASE="http://127.0.0.1:${BACKEND_PORT}/api"
 
-if [[ -f "$BACKEND_PID_FILE" ]] && kill -0 "$(cat "$BACKEND_PID_FILE")" 2>/dev/null; then
-  echo "Backend already running (pid $(cat "$BACKEND_PID_FILE"))"
+read_pid () {
+  local pid_file="$1"
+  if [[ ! -s "$pid_file" ]]; then
+    return 1
+  fi
+
+  local pid
+  pid="$(tr -d '[:space:]' < "$pid_file")"
+  if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  printf '%s' "$pid"
+}
+
+if backend_pid="$(read_pid "$BACKEND_PID_FILE")" && kill -0 "$backend_pid" 2>/dev/null; then
+  echo "Backend already running (pid $backend_pid)"
 else
   echo "Starting backend..."
   nohup "$ROOT/.venv/bin/uvicorn" app.main:app --app-dir "$ROOT/backend" --host 0.0.0.0 --port "$BACKEND_PORT" > "$LOG_DIR/backend.log" 2>&1 &
   echo $! > "$BACKEND_PID_FILE"
 fi
 
-if [[ -f "$FRONTEND_PID_FILE" ]] && kill -0 "$(cat "$FRONTEND_PID_FILE")" 2>/dev/null; then
-  echo "Frontend already running (pid $(cat "$FRONTEND_PID_FILE"))"
+if frontend_pid="$(read_pid "$FRONTEND_PID_FILE")" && kill -0 "$frontend_pid" 2>/dev/null; then
+  echo "Frontend already running (pid $frontend_pid)"
 else
   echo "Starting frontend..."
   cd "$ROOT/frontend"

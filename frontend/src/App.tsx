@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
+import { ApiRequestError, api, buildApiUrl, buildHealthUrl, resolveApiConfig } from './api'
 
 type Settings = {
   provider_mode: string
@@ -12,6 +13,8 @@ type CaseItem = {
   id: number
   title: string
   description: string | null
+  created_at: string
+  updated_at: string
 }
 
 type DocumentItem = {
@@ -39,18 +42,23 @@ type CaseDetail = CaseItem & {
   final_summary: string | null
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000/api'
+type FeedbackTone = 'success' | 'error' | 'info'
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, init)
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null)
-    throw new Error(payload?.detail ?? `Request failed: ${response.status}`)
-  }
-  return response.json() as Promise<T>
+type FeedbackState = {
+  tone: FeedbackTone
+  message: string
+} | null
+
+type RequestState = {
+  status: 'idle' | 'pending' | 'success' | 'error'
+  message: string
+  url: string
+  httpStatus: number | null
 }
 
 function App() {
+  const apiConfig = useMemo(() => resolveApiConfig(import.meta.env.VITE_API_BASE), [])
+  const apiBase = apiConfig.apiBase
   const [settings, setSettings] = useState<Settings | null>(null)
   const [cases, setCases] = useState<CaseItem[]>([])
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null)
@@ -60,96 +68,192 @@ function App() {
   const [uploading, setUploading] = useState(false)
   const [selectedFileName, setSelectedFileName] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [creatingCase, setCreatingCase] = useState(false)
   const [providerTest, setProviderTest] = useState<string>('')
   const [error, setError] = useState<string>('')
+  const [createCaseFeedback, setCreateCaseFeedback] = useState<FeedbackState>(null)
+  const [lastCreateCaseRequest, setLastCreateCaseRequest] = useState<RequestState>({
+    status: apiBase ? 'idle' : 'error',
+    message: apiConfig.configError ?? 'No request sent yet.',
+    url: apiBase ? buildApiUrl(apiBase, '/cases') : 'not configured',
+    httpStatus: null,
+  })
   const activeJob = useMemo(() => caseDetail?.jobs[0] ?? null, [caseDetail])
 
   useEffect(() => {
-    void Promise.all([loadSettings(), loadCases()])
-  }, [])
+    if (!apiBase) {
+      setError(apiConfig.configError ?? 'Frontend API is not configured.')
+      return
+    }
+
+    const currentApiBase = apiBase
+
+    async function initialize() {
+      try {
+        await Promise.all([loadSettings(currentApiBase), loadCases(currentApiBase)])
+      } catch (requestError) {
+        setError(getErrorMessage(requestError, 'Failed to load initial app data'))
+      }
+    }
+
+    void initialize()
+  }, [apiBase, apiConfig.configError])
 
   useEffect(() => {
-    if (selectedCaseId === null) {
+    if (!apiBase || selectedCaseId === null) {
       setCaseDetail(null)
       return
     }
-    void loadCaseDetail(selectedCaseId)
-  }, [selectedCaseId])
+    void loadCaseDetail(apiBase, selectedCaseId).catch((requestError) => {
+      setError(getErrorMessage(requestError, 'Failed to load case detail'))
+    })
+  }, [apiBase, selectedCaseId])
 
   useEffect(() => {
-    if (!activeJob || !['queued', 'running'].includes(activeJob.status)) {
+    if (!apiBase || !activeJob || !['queued', 'running'].includes(activeJob.status)) {
       return
     }
 
     const timer = window.setInterval(() => {
-      void loadCaseDetail(selectedCaseId ?? activeJob.id)
+      void loadCaseDetail(apiBase, selectedCaseId ?? activeJob.id).catch((requestError) => {
+        setError(getErrorMessage(requestError, 'Failed to refresh job status'))
+      })
     }, 1500)
 
     return () => window.clearInterval(timer)
-  }, [activeJob, selectedCaseId])
+  }, [activeJob, apiBase, selectedCaseId])
 
-  async function loadSettings() {
-    const payload = await api<Settings>('/settings')
-    setSettings(payload)
+  async function loadSettings(currentApiBase: string) {
+    const { data } = await api<Settings>(currentApiBase, '/settings')
+    setSettings(data)
   }
 
-  async function loadCases() {
-    const payload = await api<CaseItem[]>('/cases')
-    setCases(payload)
-    if (!selectedCaseId && payload.length > 0) {
-      setSelectedCaseId(payload[0].id)
-    }
+  async function loadCases(currentApiBase: string, preferredCaseId?: number) {
+    const { data } = await api<CaseItem[]>(currentApiBase, '/cases')
+    setCases(data)
+    setSelectedCaseId((currentSelectedCaseId) => {
+      if (preferredCaseId && data.some((item) => item.id === preferredCaseId)) {
+        return preferredCaseId
+      }
+      if (currentSelectedCaseId && data.some((item) => item.id === currentSelectedCaseId)) {
+        return currentSelectedCaseId
+      }
+      return data[0]?.id ?? null
+    })
+    return data
   }
 
-  async function loadCaseDetail(caseId: number) {
-    const payload = await api<CaseDetail>(`/cases/${caseId}`)
-    setCaseDetail(payload)
+  async function loadCaseDetail(currentApiBase: string, caseId: number) {
+    const { data } = await api<CaseDetail>(currentApiBase, `/cases/${caseId}`)
+    setCaseDetail(data)
+    return data
   }
 
   async function handleCreateCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!apiBase) {
+      const message = apiConfig.configError ?? 'Frontend API is not configured.'
+      setCreateCaseFeedback({ tone: 'error', message })
+      setLastCreateCaseRequest({
+        status: 'error',
+        message,
+        url: 'not configured',
+        httpStatus: null,
+      })
+      return
+    }
+
+    const trimmedTitle = title.trim()
+    const trimmedDescription = description.trim()
+    if (!trimmedTitle) {
+      return
+    }
+
     setError('')
-    const created = await api<CaseItem>('/cases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description }),
+    setCreateCaseFeedback({ tone: 'info', message: 'Creating case...' })
+    setCreatingCase(true)
+    setLastCreateCaseRequest({
+      status: 'pending',
+      message: 'Submitting create case request.',
+      url: buildApiUrl(apiBase, '/cases'),
+      httpStatus: null,
     })
-    setTitle('')
-    setDescription('')
-    await loadCases()
-    setSelectedCaseId(created.id)
+
+    try {
+      const { data: created, status, url } = await api<CaseItem>(apiBase, '/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: trimmedTitle, description: trimmedDescription || null }),
+      })
+
+      setCases((currentCases) => [created, ...currentCases.filter((item) => item.id !== created.id)])
+      setSelectedCaseId(created.id)
+      setCaseDetail({
+        ...created,
+        documents: [],
+        jobs: [],
+        running_summary: null,
+        final_summary: null,
+      })
+      setTitle('')
+      setDescription('')
+      setCreateCaseFeedback({ tone: 'success', message: `Created case "${created.title}".` })
+      setLastCreateCaseRequest({
+        status: 'success',
+        message: 'Create case request succeeded.',
+        url,
+        httpStatus: status,
+      })
+
+      await Promise.all([loadCases(apiBase, created.id), loadCaseDetail(apiBase, created.id)])
+    } catch (requestError) {
+      const message = getErrorMessage(requestError, 'Create case failed')
+      setCreateCaseFeedback({ tone: 'error', message })
+      setLastCreateCaseRequest({
+        status: 'error',
+        message,
+        url: buildApiUrl(apiBase, '/cases'),
+        httpStatus: requestError instanceof ApiRequestError ? requestError.status : null,
+      })
+    } finally {
+      setCreatingCase(false)
+    }
   }
 
   async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!settings) return
+    if (!apiBase || !settings) return
     setError('')
-    const updated = await api<Settings>('/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    })
-    setSettings(updated)
+    try {
+      const { data } = await api<Settings>(apiBase, '/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      setSettings(data)
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'Saving settings failed'))
+    }
   }
 
   async function handleTestProvider() {
-    if (!settings) return
+    if (!apiBase || !settings) return
     setProviderTest('Testing...')
     try {
-      const result = await api<{ ok: boolean; message: string }>('/providers/test', {
+      const { data } = await api<{ ok: boolean; message: string }>(apiBase, '/providers/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ override_settings: settings }),
       })
-      setProviderTest(result.message)
+      setProviderTest(data.message)
     } catch (requestError) {
-      setProviderTest(requestError instanceof Error ? requestError.message : 'Provider test failed')
+      setProviderTest(getErrorMessage(requestError, 'Provider test failed'))
     }
   }
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!selectedCaseId) return
+    if (!apiBase || !selectedCaseId) return
 
     const fileInput = event.currentTarget.elements.namedItem('document') as HTMLInputElement | null
     const file = fileInput?.files?.[0]
@@ -160,34 +264,41 @@ function App() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      await api(`/cases/${selectedCaseId}/documents`, { method: 'POST', body: formData })
+      await api(apiBase, `/cases/${selectedCaseId}/documents`, { method: 'POST', body: formData })
       event.currentTarget.reset()
       setSelectedFileName('')
-      await loadCaseDetail(selectedCaseId)
+      await loadCaseDetail(apiBase, selectedCaseId)
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Upload failed')
+      setError(getErrorMessage(requestError, 'Upload failed'))
     } finally {
       setUploading(false)
     }
   }
 
   async function handleProcess() {
-    if (!selectedCaseId || !settings) return
+    if (!apiBase || !selectedCaseId || !settings) return
     setProcessing(true)
     setError('')
     try {
-      await api(`/cases/${selectedCaseId}/process`, {
+      await api(apiBase, `/cases/${selectedCaseId}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider_mode: settings.provider_mode }),
       })
-      await loadCaseDetail(selectedCaseId)
+      await loadCaseDetail(apiBase, selectedCaseId)
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Processing failed')
+      setError(getErrorMessage(requestError, 'Processing failed'))
     } finally {
       setProcessing(false)
     }
   }
+
+  const createCaseStatusClassName =
+    createCaseFeedback?.tone === 'success'
+      ? 'feedback success'
+      : createCaseFeedback?.tone === 'error'
+        ? 'feedback error'
+        : 'feedback info'
 
   return (
     <main className="shell">
@@ -202,7 +313,7 @@ function App() {
         </div>
         <div className="status-card">
           <span>Health target</span>
-          <strong>{API_BASE}/health</strong>
+          <strong>{apiBase ? buildHealthUrl(apiBase) : 'not configured'}</strong>
           <span>Provider mode</span>
           <strong>{settings?.provider_mode ?? 'loading'}</strong>
         </div>
@@ -265,9 +376,14 @@ function App() {
                 placeholder="Optional context for the digest"
               />
             </label>
-            <button type="submit" disabled={!title.trim()}>
-              Create case
+            <button type="submit" disabled={!title.trim() || creatingCase || !apiBase}>
+              {creatingCase ? 'Creating...' : 'Create case'}
             </button>
+            {createCaseFeedback ? (
+              <p className={createCaseStatusClassName} aria-live="polite">
+                {createCaseFeedback.message}
+              </p>
+            ) : null}
           </form>
         </div>
       </section>
@@ -353,6 +469,39 @@ function App() {
         {error ? <p className="error">{error}</p> : null}
       </section>
 
+      {import.meta.env.DEV ? (
+        <section className="panel diagnostics">
+          <div className="toolbar">
+            <div>
+              <h2>Diagnostics</h2>
+              <p className="hint">Visible in development only. Helps catch frontend/backend target mismatches quickly.</p>
+            </div>
+          </div>
+          <dl className="diagnostics-grid">
+            <div>
+              <dt>Active API base</dt>
+              <dd>{apiBase ?? 'not configured'}</dd>
+            </div>
+            <div>
+              <dt>Last create status</dt>
+              <dd>{lastCreateCaseRequest.status}</dd>
+            </div>
+            <div>
+              <dt>Last create URL</dt>
+              <dd>{lastCreateCaseRequest.url}</dd>
+            </div>
+            <div>
+              <dt>HTTP status</dt>
+              <dd>{lastCreateCaseRequest.httpStatus ?? 'n/a'}</dd>
+            </div>
+            <div>
+              <dt>Last create message</dt>
+              <dd>{lastCreateCaseRequest.message}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
+
       <section className="grid">
         <div className="panel">
           <h2>Running summary</h2>
@@ -368,3 +517,13 @@ function App() {
 }
 
 export default App
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiRequestError) {
+    return `${fallback}: ${error.message}`
+  }
+  if (error instanceof Error && error.message) {
+    return `${fallback}: ${error.message}`
+  }
+  return fallback
+}
