@@ -71,8 +71,15 @@ export async function api<T>(apiBase: string, path: string, init?: RequestInit):
     throw new ApiRequestError(payload?.detail ?? `Request failed: ${response.status}`, response.status, url)
   }
 
+  let data: T
+  if (response.status === 204) {
+    data = undefined as T
+  } else {
+    data = (await response.json()) as T
+  }
+
   return {
-    data: (await response.json()) as T,
+    data,
     status: response.status,
     url,
   }

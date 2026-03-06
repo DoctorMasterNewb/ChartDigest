@@ -66,6 +66,14 @@ async def upload_document(case_id: int, file: UploadFile = File(...), db: Sessio
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.delete("/cases/{case_id}/documents/{document_id}", status_code=204)
+def delete_document(case_id: int, document_id: int, db: Session = Depends(get_db)) -> None:
+    try:
+        document_service.delete_document(db, case_id, document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("/cases/{case_id}/process", response_model=JobRead)
 async def start_processing(case_id: int, payload: JobCreate, db: Session = Depends(get_db)) -> JobRead:
     try:

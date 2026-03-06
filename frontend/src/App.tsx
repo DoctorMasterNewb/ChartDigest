@@ -66,6 +66,7 @@ function App() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null)
   const [selectedFileName, setSelectedFileName] = useState('')
   const [processing, setProcessing] = useState(false)
   const [creatingCase, setCreatingCase] = useState(false)
@@ -276,6 +277,20 @@ function App() {
     }
   }
 
+  async function handleDeleteDocument(documentId: number) {
+    if (!apiBase || !selectedCaseId) return
+    setError('')
+    setDeletingDocumentId(documentId)
+    try {
+      await api(apiBase, `/cases/${selectedCaseId}/documents/${documentId}`, { method: 'DELETE' })
+      await loadCaseDetail(apiBase, selectedCaseId)
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'Delete failed'))
+    } finally {
+      setDeletingDocumentId(null)
+    }
+  }
+
   async function handleProcess() {
     if (!apiBase || !selectedCaseId || !settings) return
     setProcessing(true)
@@ -431,10 +446,22 @@ function App() {
           <div className="doc-list">
             {caseDetail?.documents.map((document) => (
               <article key={document.id} className="doc-item">
-                <strong>{document.filename}</strong>
-                <span>
-                  {document.extension} · {document.text_length} chars
-                </span>
+                <div className="doc-item-row">
+                  <div>
+                    <strong>{document.filename}</strong>
+                    <span>
+                      {document.extension} · {document.text_length} chars
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => handleDeleteDocument(document.id)}
+                    disabled={deletingDocumentId === document.id}
+                  >
+                    {deletingDocumentId === document.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </article>
             ))}
             {selectedCaseId && caseDetail?.documents.length === 0 ? <p>No documents uploaded.</p> : null}

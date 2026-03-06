@@ -62,6 +62,24 @@ def load_document_text(document: Document) -> str:
     return Path(document.text_path).read_text(encoding="utf-8")
 
 
+def delete_document(db: Session, case_id: int, document_id: int) -> None:
+    document = db.scalar(select(Document).where(Document.id == document_id, Document.case_id == case_id))
+    if document is None:
+        raise ValueError("Document not found")
+
+    # Best-effort file cleanup; DB delete should still proceed.
+    for p in [document.file_path, document.text_path]:
+        try:
+            path = Path(p)
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+
+    db.delete(document)
+    db.commit()
+
+
 def _extract_text(path: Path, extension: str) -> str:
     if extension in {".txt", ".md"}:
         return path.read_text(encoding="utf-8", errors="ignore")

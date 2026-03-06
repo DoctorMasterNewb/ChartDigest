@@ -154,6 +154,23 @@ button:disabled {
   padding: 0.85rem 1rem;
 }
 
+.doc-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.doc-item-row span {
+  display: block;
+}
+
+button.danger {
+  background: linear-gradient(135deg, #8b2a22, #bf3f30);
+  color: #fff;
+  min-width: 88px;
+}
+
 .progress {
   margin-top: 0.8rem;
   width: 100%;
