@@ -16,6 +16,19 @@ Local-first prototype for chronology-aware case summarization using FastAPI, Rea
 
 ## Local run
 
+### Single-launch helper (starts backend + frontend)
+
+```bash
+cd /home/daniel/VibeProjects/ChartDigest
+./scripts/launch_local.sh
+```
+
+Stop both:
+
+```bash
+./scripts/stop_local.sh
+```
+
 ### 1. Start Ollama
 
 Make sure Ollama is running locally or on your LAN and that the chosen model is available.
