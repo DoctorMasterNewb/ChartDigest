@@ -58,6 +58,7 @@ function App() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [selectedFileName, setSelectedFileName] = useState('')
   const [processing, setProcessing] = useState(false)
   const [providerTest, setProviderTest] = useState<string>('')
   const [error, setError] = useState<string>('')
@@ -161,6 +162,7 @@ function App() {
       formData.append('file', file)
       await api(`/cases/${selectedCaseId}/documents`, { method: 'POST', body: formData })
       event.currentTarget.reset()
+      setSelectedFileName('')
       await loadCaseDetail(selectedCaseId)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Upload failed')
@@ -293,9 +295,21 @@ function App() {
           {selectedCaseId ? (
             <>
               <form className="stack" onSubmit={handleUpload}>
-                <input name="document" type="file" accept=".txt,.md,.pdf" />
-                <button type="submit" disabled={uploading}>
-                  {uploading ? 'Uploading...' : 'Upload document'}
+                <div className="file-picker-card">
+                  <p className="hint">Choose local chart file (.txt, .md, .pdf)</p>
+                  <label className="file-picker-label" htmlFor="document-input">
+                    <span>{selectedFileName || 'Select local chart file'}</span>
+                  </label>
+                  <input
+                    id="document-input"
+                    name="document"
+                    type="file"
+                    accept=".txt,.md,.pdf"
+                    onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? '')}
+                  />
+                </div>
+                <button type="submit" disabled={uploading || !selectedFileName}>
+                  {uploading ? 'Uploading...' : 'Upload selected file'}
                 </button>
               </form>
               <div className="doc-list">
