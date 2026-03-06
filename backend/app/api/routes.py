@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,25 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> S
 async def test_provider(payload: ProviderTestRequest, db: Session = Depends(get_db)) -> ProviderTestResponse:
     settings = settings_service.resolve_provider_settings(db, payload.override_settings)
     return await processing_service.test_provider_connection(settings)
+
+
+@router.get("/providers/ollama/models", response_model=list[str])
+async def list_ollama_models(db: Session = Depends(get_db)) -> list[str]:
+    settings = settings_service.get_or_create_settings(db)
+    base = settings.ollama_base_url.rstrip("/")
+    url = f"{base}/api/tags"
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Unable to list Ollama models from {url}: {exc}") from exc
+
+    models = payload.get("models", [])
+    names = [m.get("name") for m in models if isinstance(m, dict) and m.get("name")]
+    return sorted(set(names))
 
 
 @router.post("/cases", response_model=CaseRead)

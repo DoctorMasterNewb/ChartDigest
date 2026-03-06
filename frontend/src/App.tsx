@@ -71,6 +71,9 @@ function App() {
   const [processing, setProcessing] = useState(false)
   const [creatingCase, setCreatingCase] = useState(false)
   const [providerTest, setProviderTest] = useState<string>('')
+  const [ollamaModels, setOllamaModels] = useState<string[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsError, setModelsError] = useState('')
   const [error, setError] = useState<string>('')
   const [createCaseFeedback, setCreateCaseFeedback] = useState<FeedbackState>(null)
   const [lastCreateCaseRequest, setLastCreateCaseRequest] = useState<RequestState>({
@@ -91,7 +94,7 @@ function App() {
 
     async function initialize() {
       try {
-        await Promise.all([loadSettings(currentApiBase), loadCases(currentApiBase)])
+        await Promise.all([loadSettings(currentApiBase), loadCases(currentApiBase), loadOllamaModels(currentApiBase)])
       } catch (requestError) {
         setError(getErrorMessage(requestError, 'Failed to load initial app data'))
       }
@@ -127,6 +130,20 @@ function App() {
   async function loadSettings(currentApiBase: string) {
     const { data } = await api<Settings>(currentApiBase, '/settings')
     setSettings(data)
+  }
+
+  async function loadOllamaModels(currentApiBase: string) {
+    setModelsLoading(true)
+    setModelsError('')
+    try {
+      const { data } = await api<string[]>(currentApiBase, '/providers/ollama/models')
+      setOllamaModels(data)
+    } catch (requestError) {
+      setModelsError(getErrorMessage(requestError, 'Unable to load Ollama models'))
+      setOllamaModels([])
+    } finally {
+      setModelsLoading(false)
+    }
   }
 
   async function loadCases(currentApiBase: string, preferredCaseId?: number) {
@@ -358,17 +375,35 @@ function App() {
               </label>
               <label>
                 Model
-                <input
+                <select
                   value={settings.ollama_model}
                   onChange={(event) => setSettings({ ...settings, ollama_model: event.target.value })}
-                />
+                >
+                  {ollamaModels.map((modelName) => (
+                    <option key={modelName} value={modelName}>
+                      {modelName}
+                    </option>
+                  ))}
+                  {!ollamaModels.includes(settings.ollama_model) ? (
+                    <option value={settings.ollama_model}>{settings.ollama_model} (current)</option>
+                  ) : null}
+                </select>
               </label>
               <div className="actions">
                 <button type="submit">Save settings</button>
                 <button type="button" className="secondary" onClick={handleTestProvider}>
                   Test connection
                 </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => apiBase && void loadOllamaModels(apiBase)}
+                  disabled={modelsLoading}
+                >
+                  {modelsLoading ? 'Refreshing models...' : 'Refresh models'}
+                </button>
               </div>
+              {modelsError ? <p className="error">{modelsError}</p> : null}
               {providerTest ? <p className="hint">{providerTest}</p> : null}
             </form>
           ) : (
