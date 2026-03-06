@@ -292,41 +292,36 @@ function App() {
 
         <div className="panel">
           <h2>Documents</h2>
-          {selectedCaseId ? (
-            <>
-              <form className="stack" onSubmit={handleUpload}>
-                <div className="file-picker-card">
-                  <p className="hint">Choose local chart file (.txt, .md, .pdf)</p>
-                  <label className="file-picker-label" htmlFor="document-input">
-                    <span>{selectedFileName || 'Select local chart file'}</span>
-                  </label>
-                  <input
-                    id="document-input"
-                    name="document"
-                    type="file"
-                    accept=".txt,.md,.pdf"
-                    onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? '')}
-                  />
-                </div>
-                <button type="submit" disabled={uploading || !selectedFileName}>
-                  {uploading ? 'Uploading...' : 'Upload selected file'}
-                </button>
-              </form>
-              <div className="doc-list">
-                {caseDetail?.documents.map((document) => (
-                  <article key={document.id} className="doc-item">
-                    <strong>{document.filename}</strong>
-                    <span>
-                      {document.extension} · {document.text_length} chars
-                    </span>
-                  </article>
-                ))}
-                {caseDetail?.documents.length === 0 ? <p>No documents uploaded.</p> : null}
-              </div>
-            </>
-          ) : (
-            <p>Select or create a case.</p>
-          )}
+          <form className="stack" onSubmit={handleUpload}>
+            <div className="file-picker-card">
+              <p className="hint">Choose local chart file (.txt, .md, .pdf)</p>
+              <label className="file-picker-label" htmlFor="document-input">
+                <span>{selectedFileName || 'Select local chart file'}</span>
+              </label>
+              <input
+                id="document-input"
+                name="document"
+                type="file"
+                accept=".txt,.md,.pdf"
+                onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? '')}
+              />
+            </div>
+            <button type="submit" disabled={!selectedCaseId || uploading || !selectedFileName}>
+              {uploading ? 'Uploading...' : 'Upload selected file'}
+            </button>
+          </form>
+          {!selectedCaseId ? <p className="hint">Create/select a case to enable upload.</p> : null}
+          <div className="doc-list">
+            {caseDetail?.documents.map((document) => (
+              <article key={document.id} className="doc-item">
+                <strong>{document.filename}</strong>
+                <span>
+                  {document.extension} · {document.text_length} chars
+                </span>
+              </article>
+            ))}
+            {selectedCaseId && caseDetail?.documents.length === 0 ? <p>No documents uploaded.</p> : null}
+          </div>
         </div>
       </section>
 
