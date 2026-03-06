@@ -30,7 +30,16 @@ class OllamaProvider:
                 "options": {"temperature": 0.2},
             },
         )
-        response.raise_for_status()
+        if response.status_code >= 400:
+            detail = ""
+            try:
+                detail = response.text
+            except Exception:
+                detail = ""
+            raise ValueError(
+                f"Ollama generation failed ({response.status_code}) for model '{self.config.ollama_model}'. {detail}".strip()
+            )
+
         payload = response.json()
         text = payload.get("response", "").strip()
         if not text:
