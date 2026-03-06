@@ -1,0 +1,33 @@
+:root {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #2f2416;
+  background:
+    radial-gradient(circle at top left, rgba(245, 214, 180, 0.9), transparent 28%),
+    radial-gradient(circle at top right, rgba(193, 133, 77, 0.2), transparent 26%),
+    linear-gradient(180deg, #f7efe0 0%, #efe5d1 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
