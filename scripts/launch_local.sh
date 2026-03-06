@@ -25,7 +25,7 @@ if [[ -f "$FRONTEND_PID_FILE" ]] && kill -0 "$(cat "$FRONTEND_PID_FILE")" 2>/dev
 else
   echo "Starting frontend..."
   cd "$ROOT/frontend"
-  VITE_API_BASE="$API_BASE" nohup npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > "$LOG_DIR/frontend.log" 2>&1 &
+  VITE_API_BASE="$API_BASE" nohup npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" --strictPort > "$LOG_DIR/frontend.log" 2>&1 &
   echo $! > "$FRONTEND_PID_FILE"
 fi
 
