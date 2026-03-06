@@ -255,7 +255,8 @@ function App() {
     event.preventDefault()
     if (!apiBase || !selectedCaseId) return
 
-    const fileInput = event.currentTarget.elements.namedItem('document') as HTMLInputElement | null
+    const formEl = event.currentTarget
+    const fileInput = formEl.elements.namedItem('document') as HTMLInputElement | null
     const file = fileInput?.files?.[0]
     if (!file) return
 
@@ -265,7 +266,7 @@ function App() {
       const formData = new FormData()
       formData.append('file', file)
       await api(apiBase, `/cases/${selectedCaseId}/documents`, { method: 'POST', body: formData })
-      event.currentTarget.reset()
+      formEl.reset()
       setSelectedFileName('')
       await loadCaseDetail(apiBase, selectedCaseId)
     } catch (requestError) {
