@@ -367,6 +367,30 @@ function App() {
                 </select>
               </label>
               <label>
+                Processing target
+                <div className="actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setSettings({ ...settings, ollama_base_url: 'http://127.0.0.1:11434' })}
+                  >
+                    Local Ollama
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      const candidate = window.prompt('Enter LAN Ollama URL (example: http://192.168.1.50:11434)', settings.ollama_base_url)
+                      if (candidate && candidate.trim()) {
+                        setSettings({ ...settings, ollama_base_url: candidate.trim() })
+                      }
+                    }}
+                  >
+                    LAN Llama
+                  </button>
+                </div>
+              </label>
+              <label>
                 Ollama base URL
                 <input
                   value={settings.ollama_base_url}
