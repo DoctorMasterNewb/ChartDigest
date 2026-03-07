@@ -132,11 +132,12 @@ function App() {
     setSettings(data)
   }
 
-  async function loadOllamaModels(currentApiBase: string) {
+  async function loadOllamaModels(currentApiBase: string, currentBaseUrl?: string) {
     setModelsLoading(true)
     setModelsError('')
     try {
-      const { data } = await api<string[]>(currentApiBase, '/providers/ollama/models')
+      const query = currentBaseUrl ? `?base_url=${encodeURIComponent(currentBaseUrl)}` : ''
+      const { data } = await api<string[]>(currentApiBase, `/providers/ollama/models${query}`)
       setOllamaModels(data)
     } catch (requestError) {
       setModelsError(getErrorMessage(requestError, 'Unable to load Ollama models'))
@@ -421,7 +422,7 @@ function App() {
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => apiBase && void loadOllamaModels(apiBase)}
+                  onClick={() => apiBase && void loadOllamaModels(apiBase, settings.ollama_base_url)}
                   disabled={modelsLoading}
                 >
                   {modelsLoading ? 'Refreshing models...' : 'Refresh models'}

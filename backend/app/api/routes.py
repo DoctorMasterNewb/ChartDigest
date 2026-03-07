@@ -42,9 +42,9 @@ async def test_provider(payload: ProviderTestRequest, db: Session = Depends(get_
 
 
 @router.get("/providers/ollama/models", response_model=list[str])
-async def list_ollama_models(db: Session = Depends(get_db)) -> list[str]:
+async def list_ollama_models(base_url: str | None = None, db: Session = Depends(get_db)) -> list[str]:
     settings = settings_service.get_or_create_settings(db)
-    base = settings.ollama_base_url.rstrip("/")
+    base = (base_url or settings.ollama_base_url).rstrip("/")
     url = f"{base}/api/tags"
 
     try:
