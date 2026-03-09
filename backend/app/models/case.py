@@ -17,4 +17,5 @@ class Case(TimestampMixin, Base):
     documents = relationship("Document", back_populates="case", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="case", cascade="all, delete-orphan")
     summaries = relationship("Summary", back_populates="case", cascade="all, delete-orphan")
+    episode_state_versions = relationship("EpisodeStateVersion", cascade="all, delete-orphan")
 

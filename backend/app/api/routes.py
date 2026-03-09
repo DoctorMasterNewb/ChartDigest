@@ -10,7 +10,8 @@ from app.schemas.document import DocumentRead
 from app.schemas.job import JobCreate, JobRead
 from app.schemas.provider import ProviderTestRequest, ProviderTestResponse
 from app.schemas.settings import SettingsRead, SettingsUpdate
-from app.services import case_service, document_service, processing_service, settings_service
+from app.schemas.episode_state import EpisodeStateV2, EpisodeStateVersionCreate, EpisodeStateVersionRead
+from app.services import case_service, document_service, episode_state_service, processing_service, settings_service
 
 router = APIRouter(prefix="/api")
 
@@ -76,6 +77,77 @@ def get_case(case_id: int, db: Session = Depends(get_db)) -> CaseDetailRead:
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
+
+
+
+
+@router.post("/cases/{case_id}/episode-state/versions", response_model=EpisodeStateVersionRead, status_code=201)
+def create_episode_state_version(case_id: int, payload: EpisodeStateVersionCreate, db: Session = Depends(get_db)) -> EpisodeStateVersionRead:
+    try:
+        item = episode_state_service.create_episode_state_version(db, case_id, payload)
+    except episode_state_service.EpisodeStateValidationError as exc:
+        raise HTTPException(status_code=422, detail={"message": "Invalid episode state", "errors": exc.errors}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return EpisodeStateVersionRead(
+        id=item.id,
+        case_id=item.case_id,
+        version_number=item.version_number,
+        canonical_state=EpisodeStateV2.model_validate(item.canonical_state_json),
+        diff=item.diff_json,
+        stability_score=item.stability_score,
+        created_at=item.created_at,
+    )
+
+
+@router.get("/cases/{case_id}/episode-state", response_model=EpisodeStateVersionRead)
+def get_latest_episode_state(case_id: int, db: Session = Depends(get_db)) -> EpisodeStateVersionRead:
+    item = episode_state_service.get_latest_episode_state_version(db, case_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Episode state not found")
+    return EpisodeStateVersionRead(
+        id=item.id,
+        case_id=item.case_id,
+        version_number=item.version_number,
+        canonical_state=EpisodeStateV2.model_validate(item.canonical_state_json),
+        diff=item.diff_json,
+        stability_score=item.stability_score,
+        created_at=item.created_at,
+    )
+
+
+@router.get("/cases/{case_id}/episode-state/versions", response_model=list[EpisodeStateVersionRead])
+def list_episode_state_versions(case_id: int, db: Session = Depends(get_db)) -> list[EpisodeStateVersionRead]:
+    items = episode_state_service.list_episode_state_versions(db, case_id)
+    return [
+        EpisodeStateVersionRead(
+            id=item.id,
+            case_id=item.case_id,
+            version_number=item.version_number,
+            canonical_state=EpisodeStateV2.model_validate(item.canonical_state_json),
+            diff=item.diff_json,
+            stability_score=item.stability_score,
+            created_at=item.created_at,
+        )
+        for item in items
+    ]
+
+
+@router.get("/cases/{case_id}/episode-state/versions/{version_number}", response_model=EpisodeStateVersionRead)
+def get_episode_state_version(case_id: int, version_number: int, db: Session = Depends(get_db)) -> EpisodeStateVersionRead:
+    item = episode_state_service.get_episode_state_version(db, case_id, version_number)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Episode state version not found")
+    return EpisodeStateVersionRead(
+        id=item.id,
+        case_id=item.case_id,
+        version_number=item.version_number,
+        canonical_state=EpisodeStateV2.model_validate(item.canonical_state_json),
+        diff=item.diff_json,
+        stability_score=item.stability_score,
+        created_at=item.created_at,
+    )
 
 
 @router.post("/cases/{case_id}/documents", response_model=DocumentRead)
